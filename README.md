@@ -38,54 +38,7 @@ stable_dubbing/
 
 It includes modules for subtitle parsing, emotion preparation, speaker mapping, TTS generation, silence cleanup, duration alignment, audio assembly, video muxing, evaluation, reports, and logging.
 
-## Important Fixes I Made
 
-I fixed the input folder setup and speaker reference mapping.
-
-The expected input folder is:
-
-```text
-my_input/
-  video.mp4
-  script.ass
-  refs/
-    Jiang Han.wav
-    Manager.wav
-    Beastmaster 1.wav
-    Beastmaster 2.wav
-    Lu Ting.wav
-    Succubus.wav
-```
-
-Reference audio can be `.wav`, `.mp3`, `.flac`, or `.m4a`. In practice, `.wav` is safest.
-
-I also fixed a speaker reference typo during testing:
-
-```text
-Manger.mp3 -> Manager.mp3
-```
-
-I confirmed the `.ass` parser can handle multi-speaker lines like this:
-
-```ass
-Manager(male)&Beastmaster 1(male),...,, - Next: Li Jun! - Ugh, another Yellow-rank
-```
-
-The parser splits that into two separate lines, one for `Manager` and one for `Beastmaster 1`.
-
-I installed and tested the official IndexTTS2 environment. On my machine, CUDA was working:
-
-```text
-NVIDIA GeForce RTX 4060 Laptop GPU
-torch 2.8.0+cu128
-torchaudio 2.8.0+cu128
-```
-
-I downloaded the full IndexTTS2 checkpoints from Hugging Face.
-
-I also fixed checkpoint path handling by making the wrapper resolve absolute paths.
-
-And I changed the failure behavior. If every TTS line fails, the pipeline now stops with a clear error instead of crashing later during audio assembly.
 
 ## Emotion Control
 
