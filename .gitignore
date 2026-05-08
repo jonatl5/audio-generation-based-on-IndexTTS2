@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environments and package caches
+.venv/
+venv/
+env/
+third_party/
+checkpoints/
+hf_cache/
+models--*/
+
+# Dubbing outputs and generated work files
+output/
+outputs/
+runs/
+logs/
+work/
+audio/
+lines/
+evaluation/
+final_dubbed.mp4
+quality_report.json
+quality_report.md
+examples/**/output/
+
+# Media and model artifacts users may place in input folders
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.onnx
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

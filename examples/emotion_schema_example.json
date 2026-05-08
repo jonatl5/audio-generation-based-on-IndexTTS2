@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "speaker": "Jiang Han",
+    "start": 0.06,
+    "end": 3.31,
+    "target_duration": 3.25,
+    "text": "I awakened a supremely rare human-form Succubus",
+    "emotion_method": "emo_text",
+    "emo_text": "calm narration, slightly mysterious, steady pace",
+    "emo_alpha": 0.55,
+    "use_random": false,
+    "emo_vector": null
+  },
+  {
+    "id": 2,
+    "speaker": "Succubus",
+    "start": 3.31,
+    "end": 5.2,
+    "target_duration": 1.89,
+    "text": "Do not bind me.",
+    "emotion_method": "emo_vector",
+    "emo_text": "",
+    "emo_alpha": 0.65,
+    "use_random": false,
+    "emo_vector": [0.0, 0.2, 0.0, 0.1, 0.0, 0.0, 0.1, 0.3]
+  }
+]
+
