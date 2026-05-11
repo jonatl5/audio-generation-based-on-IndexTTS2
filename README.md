@@ -1,3 +1,13 @@
+# 中文更新说明
+
+原本的问题在于，IndexTTS2 在生成带有情感的短句时，经常会出现大量错误停顿，而且语速会明显变慢。第一版的解决方案是用 ffmpeg 切掉停顿部分，再通过加速或减速音频来贴合目标时长。这个方法只能在生成后做补救，尤其是大幅加速时，语调卡顿会很明显。
+
+后来我发现，有完整逻辑的长句子通常不会出现这么严重的卡顿和语速变慢问题。所以我写了自动 group 所有 subtitle lines 的脚本，通过每行第一个词的首字母是否大写，判断这一行是否应该和上一行合并成同一个生成单元。自动生成后，用户还可以手动修改 `manual_groups.json`，按自己的判断调整分组。这样同一句话会被一次性送进 IndexTTS2 生成，而不是拆成很多短句分别生成。
+
+关于加速和减速会影响生成质量的问题，IndexTTS2 论文里的一个特点就是精准的 duration control，但目前 GitHub repo 的公开推理接口并没有直接暴露这个功能。我在网上找到了一个用户工作流，里面包含 speed control，于是下载了他的文件并 reverse engineered 他的实现。ComfyUI 的做法不是用 ffmpeg 硬拉伸最终音频，而是在模型内部修改 length regulator 的目标 mel 长度：原本接近 `target_lengths = code_lens * 1.72`，加入 `duration_scale` 后变成 `target_lengths = code_lens * 1.72 * duration_scale`。这样模型会按目标语速生成语音，而不是生成完之后再强行拉伸。
+
+改进之后效果提升很大。现在 pipeline 还支持只重新生成部分错误句子，而不是每次都从头生成所有台词。这样用户可以逐句微调 timing、emotion 和 grouping，直到每一句都达到比较满意的效果。
+
 # Assessment Worklog: IndexTTS2 Dubbing Pipeline
 
 This is my worklog for the audio generation assessment.
