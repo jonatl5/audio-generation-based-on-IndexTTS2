@@ -7,7 +7,7 @@ I built a subtitle-based dubbing pipeline around IndexTTS2. The goal was to take
 The current repo contains the pipeline code, setup scripts, tests, and a finished sample video:
 
 ```text
-finished video v1.mp4
+final_dubbed_20_21_22_31_45_46.mp4
 ```
 
 That video is stored with Git LFS because it is too large for normal GitHub file storage.
@@ -388,15 +388,25 @@ Bash:
 
 ```bash
 third_party/index-tts/.venv/bin/python -m stable_dubbing.main \
-  --input_dir /path/to/input_folder
+  --input_dir /path/to/input_folder \
+  --run_name source_test_take1 \
+  --emotion-json /path/to/source_test1_emotions_aligned.json \
+  --manual-groups /path/to/manual_groups.json \
+  --auto-groups
 ```
 
 PowerShell:
 
 ```powershell
 .\third_party\index-tts\.venv\Scripts\python.exe -m stable_dubbing.main `
-  --input_dir "C:\path\to\input_folder"
+  --input_dir "C:\path\to\input_folder" `
+  --run_name source_test_take1 `
+  --emotion-json "C:\path\to\source_test1_emotions_aligned.json" `
+  --manual-groups "C:\path\to\manual_groups.json" `
+  --auto-groups
 ```
+
+Use `--emotion-json` when you already have the edited emotion/vector file. Use `--manual-groups` when you want specific subtitle lines to be generated as one continuous unit.
 
 The pipeline creates a new run folder under:
 
@@ -415,7 +425,10 @@ You can set a run name:
 ```powershell
 .\third_party\index-tts\.venv\Scripts\python.exe -m stable_dubbing.main `
   --input_dir "C:\path\to\input_folder" `
-  --run_name source_test_take1
+  --run_name source_test_take2 `
+  --emotion-json "C:\path\to\source_test1_emotions_aligned.json" `
+  --manual-groups "C:\path\to\manual_groups.json" `
+  --auto-groups
 ```
 
 ## Emotion Editing Flow
@@ -438,13 +451,15 @@ emo_vector
 
 Then save the file and press Enter in the terminal.
 
-To resume from an existing edited emotion file:
+To run from an existing edited emotion/vector file:
 
 ```powershell
 .\third_party\index-tts\.venv\Scripts\python.exe -m stable_dubbing.main `
   --input_dir "C:\path\to\input_folder" `
   --run_name source_test_take2 `
-  --resume_from_emotion_file "C:\path\to\emotions_to_edit.json"
+  --emotion-json "C:\path\to\emotions_to_edit.json" `
+  --manual-groups "C:\path\to\manual_groups.json" `
+  --auto-groups
 ```
 
 ## Rerun Evaluation Only
