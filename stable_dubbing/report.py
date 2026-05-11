@@ -23,9 +23,16 @@ def summarize_generation(metadata_rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "successful_lines": len(successful),
         "failed_lines": len(failed),
+        "successful_units": len(successful),
+        "failed_units": len(failed),
         "total_attempts": sum(int(row.get("attempts", 0)) for row in metadata_rows),
         "average_raw_duration_difference": _mean(diffs),
         "alignment_actions": dict(Counter(row.get("alignment_action", "unknown") for row in successful)),
+        "duration_scales": [
+            row.get("duration_scale")
+            for row in successful
+            if row.get("duration_scale") is not None
+        ],
     }
 
 
@@ -106,8 +113,8 @@ def write_quality_report(
         f"- Emotion file: {final_outputs.get('emotion_json', '')}",
         "",
         "## Generation Summary",
-        f"- Successful lines: {generation_summary['successful_lines']}",
-        f"- Failed lines: {generation_summary['failed_lines']}",
+        f"- Successful units: {generation_summary['successful_units']}",
+        f"- Failed units: {generation_summary['failed_units']}",
         f"- Total attempts: {generation_summary['total_attempts']}",
         f"- Average raw duration difference: {generation_summary['average_raw_duration_difference']}",
         f"- Alignment actions: {generation_summary['alignment_actions']}",
@@ -166,4 +173,3 @@ def write_quality_report(
     md_path = output / "quality_report.md"
     md_path.write_text("\n".join(lines_md) + "\n", encoding="utf-8")
     return md_path, json_path
-

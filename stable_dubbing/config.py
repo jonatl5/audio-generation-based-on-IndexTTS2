@@ -35,6 +35,49 @@ class SilenceCleanupConfig:
 
 
 @dataclass
+class PauseDetectionConfig:
+    enabled: bool = True
+    max_retries: int = 2
+    min_pause_ms: int = 350
+    silence_db_offset: float = 25.0
+    save_attempts: bool = True
+    use_asr_alignment: bool = False
+
+
+@dataclass
+class PauseRepairConfig:
+    enabled: bool = True
+    target_keep_ms: int = 140
+    min_keep_ms: int = 100
+    max_keep_ms: int = 180
+    fade_ms: int = 8
+    crossfade_ms: int = 8
+    min_piece_ms: int = 120
+
+
+@dataclass
+class SentenceGroupingConfig:
+    enabled: bool = True
+    whisperx_model: str = "base"
+    whisperx_language: str = "en"
+    whisperx_device: str = ""
+    whisperx_compute_type: str = ""
+    whisperx_batch_size: int = 16
+    boundary_min_silence_ms: int = 120
+
+
+@dataclass
+class ModelDurationControlConfig:
+    enabled: bool = True
+    first_pass_scale: float = 1.0
+    min_duration_scale: float = 0.70
+    max_duration_scale: float = 1.30
+    regenerate_if_ratio_outside: float = 0.08
+    max_model_duration_attempts: int = 2
+    final_ffmpeg_max_speed_factor: float = 1.15
+
+
+@dataclass
 class DubbingConfig:
     dialogue_styles: list[str] = field(default_factory=lambda: ["Default"])
     skip_styles: list[str] = field(
@@ -58,6 +101,10 @@ class DubbingConfig:
     mix_original: bool = False
     alignment: AlignmentConfig = field(default_factory=AlignmentConfig)
     silence_cleanup: SilenceCleanupConfig = field(default_factory=SilenceCleanupConfig)
+    pause_detection: PauseDetectionConfig = field(default_factory=PauseDetectionConfig)
+    pause_repair: PauseRepairConfig = field(default_factory=PauseRepairConfig)
+    sentence_grouping: SentenceGroupingConfig = field(default_factory=SentenceGroupingConfig)
+    model_duration_control: ModelDurationControlConfig = field(default_factory=ModelDurationControlConfig)
     evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
 
 
