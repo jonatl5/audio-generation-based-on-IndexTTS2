@@ -370,7 +370,14 @@ def run_evaluation(
     config: DubbingConfig,
 ) -> dict[str, Any]:
     eval_dir = ensure_dir(Path(output_dir) / "evaluation")
-    metadata_by_id = {int(row["line_id"]): row for row in metadata_rows if "line_id" in row}
+    metadata_by_id: dict[int, dict[str, Any]] = {}
+    for row in metadata_rows:
+        source_ids = row.get("source_line_indices") or row.get("line_ids")
+        if source_ids:
+            for line_id in source_ids:
+                metadata_by_id[int(line_id)] = row
+        elif "line_id" in row:
+            metadata_by_id[int(row["line_id"])] = row
     summary: dict[str, Any] = {}
     if config.evaluation.create_mos_sheet:
         mos_path = create_mos_rating_sheet(lines, metadata_by_id, eval_dir / "mos_rating_sheet.csv")

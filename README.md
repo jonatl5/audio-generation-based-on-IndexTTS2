@@ -23,12 +23,13 @@ The pipeline does these steps:
 3. Build a speaker map from subtitle speaker names to reference audio files.
 4. Generate an editable `emotions_to_edit.json` file.
 5. Let the user edit `emo_text`, `emo_alpha`, or paste an 8-value `emo_vector`.
-6. Run IndexTTS2 for each subtitle line.
-7. Tighten incorrect silence inside each generated line.
-8. Align each line to the subtitle timing.
-9. Assemble the final audio track.
-10. Mux the generated voice track back into the video.
-11. Write evaluation files and a quality report.
+6. Build generation units from subtitle lines.
+7. Run IndexTTS2 once for each generation unit.
+8. Tighten incorrect silence inside each generated unit.
+9. Align each unit to its subtitle timing window.
+10. Assemble the final audio track from units.
+11. Mux the generated voice track back into the video.
+12. Write evaluation files and a quality report.
 
 The main package is:
 
@@ -71,27 +72,101 @@ So "mysterious" didn't really show up as a useful emotion. For better control, I
 
 I kept the original editable JSON flow. The model still creates `emotions_to_edit.json` first, then the user can paste better vectors into that file before generation continues.
 
+## Manual Sentence Units
+
+The biggest pacing improvement came from changing what the pipeline sends to TTS.
+
+The older version generated every subtitle row by itself. That was simple, but it caused a lot of bad pauses. Many subtitle rows are only wrapped pieces of the same sentence, so the model saw fragments instead of a natural sentence. It would often pause between words that should have stayed connected.
+
+I changed the pipeline to work with generation units.
+
+A generation unit can be:
+
+```text
+one subtitle line
+several contiguous subtitle lines that belong to the same sentence
+```
+
+For grouped lines, the pipeline now generates the combined text once and keeps that audio as one file. It does not split the generated audio back into separate per-line files. The unit is placed on the final timeline from the first line's start time to the last line's end time.
+
+Manual groups live in a JSON file:
+
+```json
+{
+  "groups": [
+    {
+      "id": "u_0004_0006",
+      "lines": [4, 5, 6]
+    },
+    {
+      "id": "u_0012_0013",
+      "lines": [12, 13],
+      "text": "Optional manually edited combined text."
+    }
+  ]
+}
+```
+
+The command uses it like this:
+
+```powershell
+.\third_party\index-tts\.venv\Scripts\python.exe -m stable_dubbing.main `
+  --input_dir "C:\path\to\input_folder" `
+  --manual-groups "C:\path\to\manual_groups.json"
+```
+
+Manual groups override automatic grouping. Lines that are not listed become single-line units.
+
+The grouping file is validated before generation. Groups cannot overlap, must point to real lines, must be contiguous by default, and cannot cross speakers unless `allow_cross_speaker` is set.
+
+When the pipeline joins wrapped subtitle text, it joins with spaces unless punctuation already gives the model a reason to pause. It does not add commas by default, because commas made IndexTTS2 pause in places where I wanted continuous speech.
+
 ## Duration And Speed Handling
 
 One big issue was speed.
 
-IndexTTS2 often generated audio that was longer than the subtitle time slot. The earlier version of the pipeline tried multiple generations with lower `emo_alpha`, hoping the model would speak faster.
+IndexTTS2 often generated audio that was longer than the subtitle time slot. The first fix was ffmpeg time stretching. It worked, but it was a blunt fix. If the audio needed a large speed-up, the voice could sound compressed, and the bad pauses were still baked into the waveform.
 
-That made the run much slower.
+So I looked at how other IndexTTS2 tools controlled speed. The useful clue came from the ComfyUI IndexTTS2 wrapper. It did not just stretch the finished waveform. It changed the target mel length before diffusion and vocoder generation.
 
-I changed the alignment config so each line gets one generation only, then the pipeline time-stretches the audio:
+The model starts with semantic speech codes from GPT. Then IndexTTS2 estimates the target mel length with a rule close to this:
 
-```yaml
-alignment:
-  stretch_if_long_under_ratio: 1.0
-  regenerate_if_long_over_ratio: 999.0
-  max_regen_attempts: 1
-  max_stretch_speed_factor: 1.5
+```python
+target_lengths = code_lens * 1.72
 ```
 
-If a line would need to be sped up more than the max stretch factor, the pipeline tries punctuation-based segmentation. After that, it still aligns the audio to the subtitle slot.
+I patched the local IndexTTS2 inference path to accept `duration_scale` and apply it there:
 
-This made the pipeline less wasteful, but it did not solve every pacing problem.
+```python
+target_lengths = code_lens * 1.72 * duration_scale
+```
+
+Smaller `duration_scale` asks the model to generate shorter, faster speech. Larger `duration_scale` asks it to generate longer, slower speech.
+
+This is better than only using ffmpeg `atempo` because the model speaks closer to the intended pace from the start. ffmpeg is still used, but only for the last small correction.
+
+The pipeline now does this for each unit:
+
+1. Generate once at `duration_scale = 1.0`.
+2. Measure the raw duration.
+3. Compare it to the unit span duration.
+4. If the gap is large, regenerate the whole unit with a clamped `duration_scale`.
+5. Use light ffmpeg alignment only at the end.
+
+The related config is:
+
+```yaml
+model_duration_control:
+  enabled: true
+  first_pass_scale: 1.0
+  min_duration_scale: 0.70
+  max_duration_scale: 1.30
+  regenerate_if_ratio_outside: 0.08
+  max_model_duration_attempts: 2
+  final_ffmpeg_max_speed_factor: 1.15
+```
+
+The run metadata records the scale that was used, whether it was clamped, and whether the final correction used padding or ffmpeg.
 
 ## Silence Cleanup
 
@@ -99,7 +174,7 @@ Another problem was incorrect pauses between words.
 
 Some generated lines had pauses that were not caused by commas, periods, or natural sentence breaks. Those pauses made the line too long and sounded awkward.
 
-I added a silence cleanup step after each line is generated and before any speed-up happens.
+I added a silence cleanup step after each unit is generated and before any final duration correction happens.
 
 The idea is similar to this ffmpeg command:
 
@@ -117,9 +192,9 @@ clause break: about 0.22s
 period/question/exclamation: about 0.30s
 ```
 
-This happens before duration alignment, so the audio is cleaned first and sped up second.
+This now runs at the generation-unit level. If a grouped unit is one sentence, the detector looks at the whole generated sentence, not a chopped-up line.
 
-This is useful, but it is not perfect. Sometimes it can create a jump cut in the voice because we are cutting silence after generation instead of asking the model to speak with better pacing in the first place.
+This is useful, but it is not perfect. Sometimes it can create a jump cut in the voice because we are cutting silence after generation. The model-side duration control is a cleaner fix when the problem is overall speaking pace.
 
 ## Evaluation Work
 
@@ -143,22 +218,11 @@ I also added a command to rerun only the evaluation for a completed output folde
 
 ## Current Pitfalls
 
-The biggest pitfall is generation time.
+The biggest pitfall is still generation time.
 
 IndexTTS2 can take a long time to finish one full version of the video. On my machine, some short lines still took much longer than expected. The bottleneck looked like the mel generation stage, especially `s2mel_time`.
 
-Another pitfall is pacing control.
-
-Right now, IndexTTS2 does not expose a clean speed coefficient or a direct "pause amount" coefficient in the public inference API. That means I can't simply say:
-
-```text
-speak 15 percent faster
-use fewer pauses inside this sentence
-```
-
-So the current pipeline has to fix pacing after generation with silence removal and ffmpeg time-stretching.
-
-That works, but it is a workaround.
+Another pitfall is that the speed control patch touches the local IndexTTS2 inference code. The official public API still does not expose a clean speed parameter, so the project has to pass `duration_scale` into the model path that computes mel length.
 
 Reference audio also matters a lot. IndexTTS2 copies more than voice identity. It can copy speaking speed, rhythm, and pause style from the reference audio. When I used slower reference audio, the generated lines also became slower and had more pauses.
 
@@ -198,7 +262,7 @@ A useful future experiment would be:
 3. Measure duration, number of silence gaps, WER, and human preference.
 4. Pick a speaker-specific or scene-specific `emo_alpha` range.
 
-I would also wait for IndexTTS2 to expose better speed and pause controls. If the model later supports a real speed coefficient or pause coefficient, that would be better than cutting silence after the fact.
+I would also make the IndexTTS2 duration patch cleaner if the upstream project later exposes an official speed or duration parameter.
 
 ## How To Use This Pipeline
 
